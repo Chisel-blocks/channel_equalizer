@@ -25,14 +25,12 @@ git submodule update --init
 
 #Recursively init submodules
 SUBMODULES="complex_reciprocal"
-for module in ; do
-    cd /
+for module in $SUBMODULES; do
+    cd ./$module
     if [ -f "./init_submodules.sh" ]; then
         ./init_submodules.sh
     fi
     sbt publishLocal
 done
-
-
 exit 0
 

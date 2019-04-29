@@ -88,6 +88,7 @@ libraryDependencies  ++= Seq(
   "org.scalanlp" %% "breeze-viz" % "0.13.2"
 )
 
+libraryDependencies += "edu.berkeley.cs" %% "complex_reciprocal" % gitSubmoduleHashSnapshotVersion("complex_reciprocal")
 // Some common deps in BWRC projects, select if needed
 
 //libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
