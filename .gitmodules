@@ -1,0 +1,3 @@
+[submodule "complex_reciprocal"]
+	path = complex_reciprocal
+	url = git@bwrcrepo.eecs.berkeley.edu:dsp-blocks/chisel/complex_reciprocal.git

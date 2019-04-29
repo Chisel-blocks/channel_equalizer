@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #Init submodules in this dir, if any
 DIR="$( cd "$( dirname $0 )" && pwd )"
 git submodule update --init
@@ -24,14 +24,15 @@ git submodule update --init
 #sbt assembly
 
 #Recursively init submodules
-#SUBMODULES="#    f2_dsp #    f2_cm_serdes_lane #    "
-#for module in ; do
-#    cd /
-#    if [ -f "./init_submodules.sh" ]; then
-#        ./init_submodules.sh
-#    fi
-#    sbt publishLocal
-#done
+SUBMODULES="complex_reciprocal"
+for module in ; do
+    cd /
+    if [ -f "./init_submodules.sh" ]; then
+        ./init_submodules.sh
+    fi
+    sbt publishLocal
+done
 
 
 exit 0
+
