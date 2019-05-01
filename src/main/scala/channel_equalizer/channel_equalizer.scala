@@ -11,71 +11,71 @@ import dsptools.numbers._
 import breeze.math.Complex
 import complex_reciprocal._
 
-class channel_equalizer_io(w: Int, b:Int, weightbits : Int)
+class channel_equalizer_io( n : Int)
     extends Bundle {
         val A = Input(DspComplex(
-                FixedPoint(w.W,b.BP),
-                FixedPoint(w.W,b.BP)
+                SInt((n).W),
+                SInt((n).W)
             ) 
         )
         val Z = Output(DspComplex(
-                FixedPoint(w.W,b.BP),
-                FixedPoint(w.W,b.BP)
+                SInt((n).W),
+                SInt((n).W)
             ) 
         )
         val  reference_in= Input(DspComplex(
-                SInt(weightbits.W),
-                SInt(weightbits.W)
+                SInt(n.W),
+                SInt(n.W)
             ) 
         )
         val  estimate_in= Input(DspComplex(
-                SInt(weightbits.W),
-                SInt(weightbits.W)
+                FixedPoint((2*n).W,(n).BP),
+                FixedPoint((2*n).W,(n).BP)
             ) 
         )
         val  estimate_out= Output(DspComplex(
-                SInt(weightbits.W),
-                SInt(weightbits.W)
+                FixedPoint((2*n).W,(n).BP),
+                FixedPoint((2*n).W,(n).BP)
             ) 
         )
 
         override def cloneType = (new channel_equalizer_io(
-                w=w, 
-                b=b, 
-                weightbits=weightbits
+                n=n
             )
         ).asInstanceOf[this.type]
    }
 
-class channel_equalizer( w: Int, b:Int, weightbits : Int) extends Module {
+class channel_equalizer( n: Int) extends Module {
     val io = IO(new channel_equalizer_io( 
-            w=w, 
-            b=b, 
-            weightbits=weightbits
+            n=n
         )
     )
-    val r_A=RegInit(0.U.asTypeOf(io.A))
-    val r_Z=RegInit(0.U.asTypeOf(io.Z))
-    io.read_reference_in:=1024.U.asTypeOf(io.read_reference_in)
     val reciprocal=Module( new complex_reciprocal(
-            w=w,
-            b=b
+            w=n,
+            b=n/2
         )
     ).io
-    r_A:=io.A
-    reciprocal.N.real:=io.read_reference_in.real.asFixedPoint(0.BP)
-    reciprocal.N.imag:=io.read_reference_in.imag.asFixedPoint(0.BP)
+    val r_A=RegInit(0.U.asTypeOf(reciprocal.N.cloneType))
+    val r_Z=RegInit(0.U.asTypeOf(reciprocal.Q.cloneType))
+    val r_reference_in=RegInit(0.U.asTypeOf(reciprocal.D.cloneType))
+    r_A:=io.A.asTypeOf(reciprocal.N.cloneType)
+    r_reference_in:=io.reference_in.asTypeOf(reciprocal.D.cloneType)
+
+    reciprocal.N:=r_reference_in
     reciprocal.D:=r_A
     r_Z:=reciprocal.Q
-    io.Z:=r_Z
+    io.estimate_out:=r_Z
+
+    val w_Z=Wire(reciprocal.Q.cloneType)
+    w_Z:=r_Z*r_A
+    io.Z.real:=(w_Z.real << n/2).round.asSInt
+    io.Z.imag:=(w_Z.imag << n/2).round.asSInt
 }
 
 //This gives you verilog
 object channel_equalizer extends App {
     chisel3.Driver.execute(args, () => new channel_equalizer(
-            w=16,
-            b=8,
-            weightbits=16
+            n=16
         )
     )
 }
@@ -83,21 +83,21 @@ object channel_equalizer extends App {
 //This is a simple unit tester for demonstration purposes
 class unit_tester(c: channel_equalizer ) extends DspTester(c) {
 //Tests are here 
-    poke(c.io.A.real, 5)
-    poke(c.io.A.imag, 102)
-    step(5)
-    fixTolLSBs.withValue(0) {
-        expect(c.io.Z.real, 5)
-        expect(c.io.Z.imag, 102)
+    val A=Complex(1,-1.0)
+    val ref=Complex(32767,32767.0)
+    poke(c.io.A,A)
+    poke(c.io.reference_in,ref) 
+    step(10)
+    fixTolLSBs.withValue(1) {
+        expect(c.io.Z, ref)
+        expect(c.io.estimate_out, ref/A)
     }
 }
 
 //This is the test driver 
 object unit_test extends App {
     iotesters.Driver.execute(args, () => new channel_equalizer(
-            w=16,
-            b=8,
-            weightbits=16
+            n=16
         )
     ){
             c=>new unit_tester(c)
