@@ -34,6 +34,7 @@ for module in $SUBMODULES; do
         ./init_submodules.sh
     fi
     sbt publishLocal
+    cd ${DIR}
 done
 exit 0
 
