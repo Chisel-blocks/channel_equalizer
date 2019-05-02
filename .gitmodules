@@ -1,3 +1,6 @@
 [submodule "complex_reciprocal"]
 	path = complex_reciprocal
 	url = git@bwrcrepo.eecs.berkeley.edu:dsp-blocks/chisel/complex_reciprocal.git
+[submodule "memblock"]
+	path = memblock
+	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/memblock.git

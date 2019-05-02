@@ -24,7 +24,10 @@ git submodule update --init
 #sbt assembly
 
 #Recursively init submodules
-SUBMODULES="complex_reciprocal"
+SUBMODULES="\
+    complex_reciprocal \
+    memblock \
+    "
 for module in $SUBMODULES; do
     cd ./$module
     if [ -f "./init_submodules.sh" ]; then

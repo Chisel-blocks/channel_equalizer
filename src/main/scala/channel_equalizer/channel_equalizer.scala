@@ -44,6 +44,8 @@ class channel_equalizer_io(
         )
 
         val  estimate_format= Input(UInt(1.W))
+        val reference_mem_write_enable=(Input(Bool))
+        val reference_mem_read_enable=(Input(Bool))
         
 
         override def cloneType = (new channel_equalizer_io(
@@ -71,7 +73,9 @@ class channel_equalizer(
         )
     ).io
     val reference_mem=SyncReadMem(scala.math.pow(2,log2Ceil(symbol_length)).toInt,io.estimate_out.cloneType)
-    //val estimate_mem=Vec(users,SyncReadMem(scala.math.pow(2,log2Ceil(symbol_length)).toInt,io.estimate_out.cloneType))
+    val estimate_mem=Seq.fill(users){SyncReadMem(scala.math.pow(2,log2Ceil(symbol_length)).toInt,io.estimate_out.cloneType)}
+
+    
 
     val r_A=RegInit(0.U.asTypeOf(io.A.cloneType))
     val r_Z=RegInit(0.U.asTypeOf(reciprocal.Q.cloneType))
