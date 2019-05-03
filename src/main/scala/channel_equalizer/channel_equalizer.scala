@@ -44,8 +44,8 @@ class channel_equalizer_io(
         )
 
         val  estimate_format= Input(UInt(1.W))
-        val reference_mem_write_enable=(Input(Bool))
-        val reference_mem_read_enable=(Input(Bool))
+        val reference_mem_write_enable=(Input(Bool()))
+        val reference_mem_read_enable=(Input(Bool()))
         
 
         override def cloneType = (new channel_equalizer_io(
