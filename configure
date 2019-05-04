@@ -64,6 +64,15 @@ TEST_TARGETS = \$(foreach name,\$(MODULES), test_\$(name))
 #Commands
 SBT=sbt -J-Xmx16G -J-Xss8M
 
+#Default parameters
+n ?= 16
+symbol_length ?= 64
+users ?= 16
+
+MAINPARAMS = -n \$(n) \\
+             -symbol_length \$(symbol_length) \\
+             -users \$(users) 
+
 TOUCH=touch -r
 `for i in ${VPATHDIRS}; do
     echo vpath %.scala \\$\(SCALAPATH\)/$i
@@ -94,10 +103,10 @@ done`
 	\$(eval package:=\$(basename \$(notdir \$@)))
 	\$(eval class:=\$(basename \$(notdir \$@)))
 	\$(eval testbenchfile:=\$(dir \$<)tb_\$(notdir \$<))
-	\$(SBT) 'runMain \$(package).\$(class) -td \$(VERILOGPATH)' 
+	\$(SBT) 'runMain \$(package).\$(class) \$(MAINPARAMS) -td \$(VERILOGPATH)' 
 	@#Test if testbech generator exists and compile it
 	@if [ -f \$(testbenchfile) ]; then \\
-		\$(SBT) 'runMain \$(package).tb_\$(class) -td \$(VERILOGPATH)'; \\
+	\$(SBT) 'runMain \$(package).tb_\$(class) \$(MAINPARAMS) -td \$(VERILOGPATH)'; \\
 	fi
 clean:
 	rm -f \$(VERILOGPATH)/*.v

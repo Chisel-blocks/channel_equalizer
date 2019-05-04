@@ -123,14 +123,64 @@ class channel_equalizer(
 
 //This gives you verilog
 object channel_equalizer extends App {
-    chisel3.Driver.execute(args, () => new channel_equalizer(
-            n=16,
-            symbol_length=64,
-            users=16
+  // Getopts parses the "Command line arguments for you"  
+  def getopts(options : Map[String,String], 
+      arguments: List[String]) : (Map[String,String], List[String]) = {
+      //This the help
+      val usage = """
+          |Usage: channel_equalizer.channel_equalizer [-<option>]
+          |
+          | Options
+          |     n              [Int]    : Number of input bits. Default 16
+          |     symbol_length  [Int]    : Channel length.       Default 64         
+          |     users          [Int]    : Number of users.      Default 16
+          |     h                       : This help 
+        """.stripMargin
+      val optsWithArg: List[String]=List(
+          "-n",
+          "-symbol_length",
+          "-users"
+      )
+      //Handling of flag-like options to be defined 
+      arguments match {
+          case "-h" :: tail => {
+              println(usage)
+              val (newopts, newargs) = getopts(options, tail)
+              sys.exit
+              (Map("h"->"") ++ newopts, newargs)
+          }
+          case option :: value :: tail if optsWithArg contains option => {
+             val (newopts, newargs) = getopts(
+                 options++Map(option.replace("-","") -> value), tail
+             )
+             (newopts, newargs)
+          }
+          case argument :: tail => {
+               val (newopts, newargs) = getopts(options,tail)
+               (newopts, argument.toString +: newargs)
+            }
+          case Nil => (options, arguments)
+      }
+  }
+   
+  // Default options
+  val defaultoptions : Map[String,String]=Map(
+      "n"->"16",
+      "symbol_length"->"64",
+      "users"->"16"
+      ) 
+  // Parse the options
+  val (options,arguments)= getopts(defaultoptions,args.toList)
+
+    chisel3.Driver.execute(arguments.toArray, () => new channel_equalizer(
+            n=options("n").toInt,
+            symbol_length=options("symbol_length").toInt,
+            users=options("users").toInt
         )
     )
 }
 
+//[TODO] Modify test to use parameters
 //This is a simple unit tester for demonstration purposes
 class unit_tester(c: channel_equalizer ) extends DspTester(c) {
 //Tests are here 
