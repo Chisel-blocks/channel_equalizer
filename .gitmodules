@@ -4,3 +4,6 @@
 [submodule "memblock"]
 	path = memblock
 	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/memblock.git
+[submodule "edge_detector"]
+	path = edge_detector
+	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/edge_detector.git

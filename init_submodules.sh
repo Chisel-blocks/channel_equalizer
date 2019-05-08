@@ -27,6 +27,7 @@ git submodule update --init
 SUBMODULES="\
     complex_reciprocal \
     memblock \
+    edge_detector \
     "
 for module in $SUBMODULES; do
     cd ./$module
