@@ -115,7 +115,7 @@ clean:
 	rm -rf \$(VERILOGPATH)
 	#rm -rf \$(DEPDIR)
 
-MMOD ?=
+MMOD ?= channel_equalizer
 memmap:
 	cp \$(VERILOGPATH)/\$(MMOD).v  \$(VERILOGPATH)/\$(MMOD)_unmapped.orig.v
 	\$(SBT) 'runMain \$(MMOD).\$(MMOD) -td \$(VERILOGPATH) --infer-rw \$(MMOD) --repl-seq-mem -c:\$(MMOD):-o:\$(VERILOGPATH)/\$(MMOD).conf'

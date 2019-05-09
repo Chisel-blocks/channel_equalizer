@@ -89,6 +89,8 @@ libraryDependencies  ++= Seq(
 )
 
 libraryDependencies += "edu.berkeley.cs" %% "complex_reciprocal" % gitSubmoduleHashSnapshotVersion("complex_reciprocal")
+libraryDependencies += "edu.berkeley.cs" %% "memblock" % gitSubmoduleHashSnapshotVersion("memblock")
+libraryDependencies += "edu.berkeley.cs" %% "edge_detector" % gitSubmoduleHashSnapshotVersion("edge_detector")
 // Some common deps in BWRC projects, select if needed
 
 //libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
