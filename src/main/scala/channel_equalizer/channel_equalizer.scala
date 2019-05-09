@@ -11,6 +11,7 @@ import dsptools.numbers._
 import breeze.math.Complex
 import scala.math._
 import complex_reciprocal._
+import memblock._
 
 class channel_equalizer_io( 
         n : Int, 
@@ -50,20 +51,20 @@ class channel_equalizer_io(
 
         val estimate_format= Input(UInt(1.W))
         
-        val reference_read_addr=(log2Ceil(symbol_length).W)
-        val reference_read_enable=(Input(Bool()))
-        val reference_write_addr=(log2Ceil(symbol_length).W)
-        val reference_write_en=(Input(Bool()))
-        val reference_mode=(Input(UInt(2.W)) //0 internal read, 1 write in, read out
+        val reference_read_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val reference_read_enable=Input(Bool())
+        val reference_write_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val reference_write_en=Input(Bool())
+        val reference_mode=Input(UInt(2.W)) //0 internal read, 1 write in, read out
 
-        val estimate_read_enable=(Input(Bool()))
-        val estimate_read_addr=(log2Ceil(symbol_length).W)
-        val estimate_write_en=(Input(Bool()))
-        val estimate_write_addr=(log2Ceil(symbol_length).W)
-        val estimate_mode=(Input(UInt(2.W)) //0 internal read/write, 1 write in, read out
+        val estimate_read_enable=Input(Bool())
+        val estimate_read_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val estimate_write_en=Input(Bool())
+        val estimate_write_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val estimate_mode=Input(UInt(2.W)) //0 internal read/write, 1 write in, read out
 
-        val equalize_sync=(Input(Bool())) //Rising edge resets the bin counters
-        val estimate_sync=(Input(Bool())) //Rising edge resets the bin counters
+        val equalize_sync=Input(Bool()) //Rising edge resets the bin counters
+        val estimate_sync=Input(Bool()) //Rising edge resets the bin counters
         
 
         override def cloneType = (new channel_equalizer_io(
@@ -203,10 +204,11 @@ class channel_equalizer(
         // State operation
         when ( r_reference_read_enable ) {
             reference_mem.read_addr:=r_reference_read_addr
-            r_reference_read_val:= reference_mem.read_val        }
+            r_reference_read_val:= reference_mem.read_val
+        }
         when ( r_estimate_read_enable ) {
             estimate_mem.read_addr:=r_estimate_read_addr
-            r_estimate_read_val:= estimate_mem.read_val        }
+            r_estimate_read_val:= estimate_mem.read_val
         }
         // State transition
         when (( ! r_reference_read_enable ) && (! r_estimate_read_enable )) {
