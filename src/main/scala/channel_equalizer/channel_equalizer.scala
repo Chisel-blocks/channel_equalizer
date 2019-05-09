@@ -52,16 +52,15 @@ class channel_equalizer_io(
 
         val estimate_format= Input(UInt(1.W))
         
-        val reference_read_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val reference_addr=Input(UInt(log2Ceil(symbol_length).W))
+
         val reference_read_en=Input(Bool())
-        val reference_write_addr=Input(UInt(log2Ceil(symbol_length).W))
         val reference_write_en=Input(Bool())
         val reference_mode=Input(UInt(2.W)) //0 internal read, 1 write in, read out
 
         val estimate_read_en=Input(Bool())
-        val estimate_read_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val estimate_addr=Input(UInt(log2Ceil(symbol_length).W))
         val estimate_write_en=Input(Bool())
-        val estimate_write_addr=Input(UInt(log2Ceil(symbol_length).W))
         val estimate_mode=Input(UInt(2.W)) //0 internal read/write, 1 write in, read out
 
         val equalize_sync=Input(Bool()) //Rising edge resets the bin counters
@@ -119,9 +118,8 @@ class channel_equalizer(
     val r_Z=RegInit(0.U.asTypeOf(io.Z))
     // Registers for reference IO
     val r_reference_in=RegInit(0.U.asTypeOf(io.reference_in.cloneType))
-    val r_reference_write_addr=RegInit(0.U.asTypeOf(io.reference_write_addr.cloneType))
     val r_reference_write_val=RegInit(0.U.asTypeOf(io.reference_in.cloneType))
-    val r_reference_read_addr=RegInit(0.U.asTypeOf(io.reference_read_addr.cloneType))
+    val r_reference_addr=RegInit(0.U.asTypeOf(io.reference_addr.cloneType))
     val r_reference_write_en=RegInit(0.U.asTypeOf(io.reference_write_en.cloneType))
     val r_reference_read_en=RegInit(0.U.asTypeOf(io.reference_read_en.cloneType))
     val r_reference_read_val=RegInit(0.U.asTypeOf(io.reference_out.cloneType))
@@ -129,8 +127,7 @@ class channel_equalizer(
     // Registers for estimate IO
     val r_estimate_user_index=RegInit(0.U.asTypeOf(io.estimate_user_index.cloneType))
     val r_estimate_in=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.estimate_in(0).cloneType))))
-    val r_estimate_write_addr=RegInit(0.U.asTypeOf(io.estimate_write_addr.cloneType))
-    val r_estimate_read_addr=RegInit(0.U.asTypeOf(io.estimate_read_addr.cloneType))
+    val r_estimate_addr=RegInit(0.U.asTypeOf(io.estimate_addr.cloneType))
     val r_estimate_write_en=RegInit(0.U.asTypeOf(io.estimate_write_en.cloneType))
     val r_estimate_write_val=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.estimate_out(0).cloneType))))
     val r_estimate_read_en=RegInit(0.U.asTypeOf(io.estimate_read_en.cloneType))
@@ -145,24 +142,22 @@ class channel_equalizer(
     r_estimate_format:=io.estimate_format
 
     r_reference_in:=io.reference_in
-    r_reference_write_addr:=io.reference_write_addr
     r_reference_write_val:=io.reference_in
-    r_reference_read_addr:=io.reference_read_addr
+    r_reference_addr:=io.reference_addr
     r_reference_read_en:=io.reference_read_en
 
     (r_estimate_in,io.estimate_in).zipped.map(_:=_)
-    r_estimate_write_addr:=io.estimate_write_addr
     (r_estimate_write_val,io.estimate_in).zipped.map(_:=_)
     r_estimate_read_en:=io.estimate_read_en
 
     // Mem input defaults
-    reference_mem.write_addr:=r_reference_write_addr
-    reference_mem.read_addr:=r_reference_read_addr
+    reference_mem.write_addr:=r_reference_addr
+    reference_mem.read_addr:=r_reference_addr
     reference_mem.write_val:=r_reference_in
     reference_mem.write_en:=false.B
 
-    estimate_mem.map(_.write_addr:=r_estimate_write_addr)
-    estimate_mem.map(_.read_addr:=r_estimate_read_addr)
+    estimate_mem.map(_.write_addr:=r_estimate_addr)
+    estimate_mem.map(_.read_addr:=r_estimate_addr)
     (estimate_mem,r_estimate_in).zipped.map(_.write_val:=_)
     estimate_mem.map(_.write_en:=false.B)
 
@@ -204,12 +199,12 @@ class channel_equalizer(
     }.elsewhen( state === updating ) {
         // State operation
         when ( r_reference_write_en ) {
-            reference_mem.write_addr:=r_reference_write_addr
+            reference_mem.write_addr:=r_reference_addr
             reference_mem.write_val:=r_reference_write_val
             reference_mem.write_en:=true.B 
         }
         when ( r_estimate_write_en ) {
-            estimate_mem.map(_.write_addr:=r_estimate_write_addr)
+            estimate_mem.map(_.write_addr:=r_estimate_addr)
             (estimate_mem,r_estimate_write_val).zipped.map(_.write_val:=_)
             estimate_mem.map(_.write_en:=true.B)
         }
@@ -222,11 +217,11 @@ class channel_equalizer(
     }.elsewhen( state === reading ) {
         // State operation
         when ( r_reference_read_en ) {
-            reference_mem.read_addr:=r_reference_read_addr
+            reference_mem.read_addr:=r_reference_addr
             r_reference_read_val:= reference_mem.read_val
         }
         when ( r_estimate_read_en ) {
-            estimate_mem.map(_.read_addr:=r_estimate_read_addr)
+            estimate_mem.map(_.read_addr:=r_estimate_addr)
             (r_estimate_read_val,estimate_mem).zipped.map(_:= _.read_val)
         }
         // State transition
