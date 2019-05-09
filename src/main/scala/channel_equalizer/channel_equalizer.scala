@@ -49,14 +49,21 @@ class channel_equalizer_io(
         )
 
         val estimate_format= Input(UInt(1.W))
-        val reference_mem_read_addr=(log2Ceil(symbol_length).W)
-        val reference_mem_read_enable=(Input(Bool()))
-        val reference_mem_write_addr=(log2Ceil(symbol_length).W)
-        val reference_mem_write_enable=(Input(Bool()))
-        val estimate_mem_read_enable=(Input(Bool()))
-        val estimate_mem_read_addr=(log2Ceil(symbol_length).W)
-        val estimate_mem_write_enable=(Input(Bool()))
-        val estimate_mem_write_addr=(log2Ceil(symbol_length).W)
+        
+        val reference_read_addr=(log2Ceil(symbol_length).W)
+        val reference_read_enable=(Input(Bool()))
+        val reference_write_addr=(log2Ceil(symbol_length).W)
+        val reference_write_en=(Input(Bool()))
+        val reference_mode=(Input(UInt(2.W)) //0 internal read, 1 write in, read out
+
+        val estimate_read_enable=(Input(Bool()))
+        val estimate_read_addr=(log2Ceil(symbol_length).W)
+        val estimate_write_en=(Input(Bool()))
+        val estimate_write_addr=(log2Ceil(symbol_length).W)
+        val estimate_mode=(Input(UInt(2.W)) //0 internal read/write, 1 write in, read out
+
+        val equalize_sync=(Input(Bool())) //Rising edge resets the bin counters
+        val estimate_sync=(Input(Bool())) //Rising edge resets the bin counters
         
 
         override def cloneType = (new channel_equalizer_io(
@@ -83,54 +90,183 @@ class channel_equalizer(
             b=n/2
         )
     ).io
-    val reference_mem=Seq.fill(users){SyncReadMem(scala.math.pow(2,log2Ceil(symbol_length)).toInt,io.estimate_out.cloneType)}
 
-    val estimate_mem=Seq.fill(users){SyncReadMem(scala.math.pow(2,log2Ceil(symbol_length)).toInt,io.estimate_out.cloneType)}
+    val reference_mem=Module( new memblock(proto=io.reference_in.cloneType, symbol_length))
+    val estimate_mem=Module( new memblock(proto=io.estimate_in.cloneType, symbol_length))
 
-    
+    val reference_read_edge= Module(new edge_detector()).io 
+    reference_read_edge.A=io.reference_read_enable 
+    val reference_write_edge= Module(new edge_detector()).io 
+    reference_write_edge.A=io.reference_write_enable 
+    val estimate_read_edge= Module(new edge_detector()).io 
+    estimate_read_edge.A=io.estimate_read_enable 
+    val estimate_write_edge= Module(new edge_detector()).io 
+    estimate_write_edge.A=io.estimate_write_enable 
+    val equalize_sync_edge= Module(new edge_detector()).io 
+    equalize_sync_edge.A=io.equalize_sync_edge
+    val estimate_sync_edge= Module(new edge_detector()).io 
+    estimate_sync_edge.A=io.estimate_sync_edge
 
+    // Signal IO registers
     val r_A=RegInit(0.U.asTypeOf(io.A.cloneType))
-    val r_Z=RegInit(0.U.asTypeOf(reciprocal.Q.cloneType))
+    val r_equalized=RegInit(0.U.asTypeOf(reciprocal.Q.cloneType))
+    val r_Z=RegInit(0.U.asTypeOf(io.Z))
+    // Registers for reference IO
     val r_reference_in=RegInit(0.U.asTypeOf(io.reference_in.cloneType))
+    val r_reference_write_addr=RegInit(0.U.asTypeOf(io.reference_write_addr.cloneType))
+    val r_reference_read_addr=RegInit(0.U.asTypeOf(io.reference_read_addr.cloneType))
+    val r_reference_write_en=RegInit(0.U.asTypeOf(io.reference_write_en.cloneType))
+    val r_reference_read_val=RegInit(0.U.asTypeOf(io.reference_out.cloneType))
+
+    // Registers for estimate IO
+    val r_estimate_in=RegInit(0.U.asTypeOf(io.estimate_in.cloneType))
+    val r_estimate_write_addr=RegInit(0.U.asTypeOf(io.estimate_write_addr.cloneType))
+    val r_estimate_read_addr=RegInit(0.U.asTypeOf(io.estimate_read_addr.cloneType))
+    val r_estimate_write_en=RegInit(0.U.asTypeOf(io.estimate_write_en.cloneType))
+    val r_estimate_read_val=RegInit(0.U.asTypeOf(io.estimate_out.cloneType))
+
     val r_N=RegInit(0.U.asTypeOf(reciprocal.N.cloneType))
     val r_D=RegInit(0.U.asTypeOf(reciprocal.D.cloneType))
     val r_estimate_format=RegInit(0.U.asTypeOf(io.estimate_format))
 
-    //Register assingments
+    //Register assignments
     r_A:=io.A
-    r_reference_in:=io.reference_in
     r_estimate_format:=io.estimate_format
+    r_reference_in:=io.reference_in
+    r_reference_write_addr:=io.reference_write_addr
+    r_reference_read_addr:=io.reference_read_addr
+    r_estimate_in:=io.estimate_in
+    r_estimate_write_addr:=io.estimate_write_addr
+
+    // Mem input defaults
+    reference_mem.write_addr=r_reference_write_addr
+    reference_mem.write_val=r_reference_in
+    reference_mem.write_en=false.B
+    estimate_mem.write_addr=r_estimate_write_addr
+    estimate_mem.write_val=r_restimate_in
+    estimate_mem.write_en=false.B
+
+   
+    // State machine for channel estimation and equalization
+    val equalizing:: estimating :: updating :: reading:: Nil = Enum(4)
+
+    val state=RegInit(equalizing)  // The default state
     
+    val w_address_counter_reset=Wire(Bool())
+    val address_counter=withReset(w_address_counter_reset){RegInit(0.U(log2Ceil(symbol_length).W))}
+    when(reset){
+        w_address_counter_reset:=true.B
+    }.elsewhen( equalize_sync_edge.rising || estimate_sync_edge_rising ){
+        w_address_counter_reset:=true.B
+    }.otherwise{
+        w_address_counter_reset:=false.B
+        address_counter:=address_counter+1.U
+    }
+
+    // State machine
+    when ( state === equalizing ){
+        // State operation
+        reference_mem.read_addr:=address_counter
+        reference_mem.write_en:=false.B
+        estimate_mem.read_addr:=address_counter
+        estimate_mem.write_en:=false.B
+
+        // State transition
+        when( reference_write_edge.rising || estimate_write_edge.rising  ) {
+            state=updating
+        }.elsewhen ( reference_read_edge.rising || estimate_read_edge_rising) {
+            state=reading 
+        }.elsewhen ( estimate_sync_edge.rising ) {
+            state=estimating
+        }. otherwise {
+            state=equalizing
+        }
+    }.elsewhen( state==updating ) {
+        // State operation
+        when ( r_reference_write_enable ) {
+            reference_mem.write_addr:=r_reference_write_addr
+            reference_mem.write_val:=r_reference_write_val
+            reference_mem.write_en:=true.B 
+        }
+        when ( r_estimate_write_enable ) {
+            estimate_mem.write_addr:=r_estimate_write_addr
+            estimate_mem.write_val:=r_estimate_write_val
+            estimate_mem.write_en:=true.B 
+        }
+        // State transition
+        when (( ! r_reference_write_enable ) && (! r_estimate_write_enable )) {
+            state:=equalizing
+        }.otherwise{
+            state:=updating
+        }
+    }.elsewhen( state==reading ) {
+        // State operation
+        when ( r_reference_read_enable ) {
+            reference_mem.read_addr:=r_reference_read_addr
+            r_reference_read_val:= reference_mem.read_val        }
+        when ( r_estimate_read_enable ) {
+            estimate_mem.read_addr:=r_estimate_read_addr
+            r_estimate_read_val:= estimate_mem.read_val        }
+        }
+        // State transition
+        when (( ! r_reference_read_enable ) && (! r_estimate_read_enable )) {
+            state:=equalizing
+        }.otherwise{
+            state:=reading
+        }
+    }.elsewhen( state==estimating ) {
+        reference_mem.read_addr:=address_counter
+        reference_mem.write_en:=false.B
+        estimate_mem.write_addr:=address_counter
+        estimate_mem.write_en:=true.B
+        estimate_mem.write_val.real:=reciprocal.Q.asTypeOf(estimate_mem.write_val).real
+        estimate_mem.write_val.imag:=reciprocal.Q.asTypeOf(estimate_mem.write_val).imag
+
+        // State transition
+        when ( address_counter.toInt < log2Ceil(symbol_length) ) {
+            state:=estimating
+        }.otherwise{
+            state:=equalizing
+        }
+    }.otherwise{
+        state:=equalizing
+    }
+
     //Reciprocal connections
     reciprocal.N:=r_N
     reciprocal.D:=r_D
-    r_Z:=reciprocal.Q
     when (r_estimate_format === 0.U) {
         // Reciprocal channel response.
         // Compensation required to get the reference
         // for local beamforming
-        r_N:=r_reference_in.asTypeOf(reciprocal.D.cloneType)
-        r_D:=r_A.asTypeOf(reciprocal.N.cloneType)
+        r_N:=reference_mem.read_val.asTypeOf(reciprocal.N.cloneType)
+        r_D:=r_A.asTypeOf(reciprocal.D.cloneType)
     }.elsewhen(r_estimate_format === 1.U) {
         // Channel response. 
         // Attenuation relative to reference
         r_N:=r_A.conj().asTypeOf(reciprocal.N.cloneType)
-        r_D.real:=r_reference_in.asTypeOf(reciprocal.D.cloneType).real
-        r_D.imag:=r_reference_in.asTypeOf(reciprocal.D.cloneType).imag
+        r_D.real:=reference_mem.read_val.asTypeOf(reciprocal.D.cloneType).real
+        r_D.imag:=reference_mem_read_val.asTypeOf(reciprocal.D.cloneType).imag
     }.otherwise {
         // Reciprocal format.
         // Compensation required to get the reference
         // for local beamforming
-        r_N:=r_reference_in.asTypeOf(reciprocal.D.cloneType)
-        r_D:=r_A.asTypeOf(reciprocal.N.cloneType)
+        r_N:=reference_mem.read_val.asTypeOf(reciprocal.N.cloneType)
+        r_D:=r_A.asTypeOf(reciprocal.D.cloneType)
     }
 
-    io.estimate_out:=r_Z
     
-    val w_Z=Wire(reciprocal.Q.cloneType)
-    w_Z:=r_Z*r_A.asTypeOf(reciprocal.D.cloneType)
-    io.Z.real:=(w_Z.real << n/2).round.asSInt
-    io.Z.imag:=(w_Z.imag << n/2).round.asSInt
+    // Equalization and rounding
+    r_equalized:=reciprocal.Q*r_A.asTypeOf(reciprocal.D.cloneType)
+    r_Z.real:=(r_equalized.real << n/2).round.asSInt
+    r_Z.imag:=(r_equalized.imag << n/2).round.asSInt
+
+    // Output assignments
+    io.reference_out:=r_reference_read_val
+    io.estimate_out:=r_estimate_read_val
+  
+    io.Z.real:=r_Z
+    io.Z.imag:=r_Z
 }
 
 //This gives you verilog
