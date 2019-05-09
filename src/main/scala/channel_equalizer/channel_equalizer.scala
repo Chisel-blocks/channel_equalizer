@@ -143,6 +143,7 @@ class channel_equalizer(
 
     r_reference_in:=io.reference_in
     r_reference_write_val:=io.reference_in
+    r_reference_write_en:=io.reference_write_en
     r_reference_addr:=io.reference_addr
     r_reference_read_en:=io.reference_read_en
 
