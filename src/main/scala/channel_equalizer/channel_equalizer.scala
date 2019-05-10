@@ -92,13 +92,18 @@ class channel_equalizer(
             b=n/2
         )
     ).io
-
+    val reciprocal_latency=6
+    
     val reference_mem=Module( new memblock(proto=io.reference_in.cloneType, symbol_length)).io
     val estimate_mem=VecInit(Seq.fill(users){
             Module( new memblock(proto=io.estimate_in(0).cloneType, symbol_length)).io
         }
     )
-
+    val mem_latency=4
+    val r_estimate_sync=RegInit(false.B)
+    val r_equalize_sync=RegInit(false.B)
+    r_estimate_sync:=io.estimate_sync
+    r_equalize_sync:=io.equalize_sync
     val reference_read_edge= Module(new edge_detector()).io 
     reference_read_edge.A:=io.reference_read_en 
     val reference_write_edge= Module(new edge_detector()).io 
@@ -108,9 +113,9 @@ class channel_equalizer(
     val estimate_write_edge= Module(new edge_detector()).io 
     estimate_write_edge.A:=io.estimate_write_en 
     val equalize_sync_edge= Module(new edge_detector()).io 
-    equalize_sync_edge.A:=io.equalize_sync
+    equalize_sync_edge.A:=r_equalize_sync
     val estimate_sync_edge= Module(new edge_detector()).io 
-    estimate_sync_edge.A:=io.estimate_sync
+    estimate_sync_edge.A:=r_estimate_sync
 
     // Signal IO registers
     val r_A=RegInit(0.U.asTypeOf(io.A.cloneType))
@@ -137,8 +142,12 @@ class channel_equalizer(
     val r_D=RegInit(0.U.asTypeOf(reciprocal.D.cloneType))
     val r_estimate_format=RegInit(0.U.asTypeOf(io.estimate_format))
 
+    val r_estimate_done=RegInit(false.B)
+    val r_estimate_done_flag=RegInit(false.B)
+    val r_write_en=RegInit(false.B)
+
     //Register assignments
-    r_A:=io.A
+    r_A:=ShiftRegister(io.A,1) // delay to sync with estimate sync
     r_estimate_format:=io.estimate_format
 
     r_reference_in:=io.reference_in
@@ -168,23 +177,23 @@ class channel_equalizer(
 
     val state=RegInit(equalizing)  // The default state
     
-    val w_address_counter_reset=Wire(Bool())
-    val address_counter=withReset(w_address_counter_reset){RegInit(0.U(log2Ceil(symbol_length).W))}
-    when(reset.toBool()){
-        w_address_counter_reset:=true.B
-    }.elsewhen( equalize_sync_edge.rising || estimate_sync_edge.rising ){
-        w_address_counter_reset:=true.B
+    val estimate_address_counter=RegInit(0.U(log2Ceil(symbol_length).W))
+    val equalize_address_counter=RegInit(0.U(log2Ceil(symbol_length).W))
+
+    // This runs in background so it is only dependent on sync
+    when( equalize_sync_edge.rising ){
+        equalize_address_counter:=0.U
     }.otherwise{
-        w_address_counter_reset:=false.B
-        address_counter:=address_counter+1.U
+        equalize_address_counter:=equalize_address_counter+1.U
     }
 
     // State machine
     when ( state === equalizing ){
         // State operation
-        reference_mem.read_addr:=address_counter
+        reference_mem.read_addr:=0.U.asTypeOf(reference_mem.read_addr)
+        estimate_address_counter:=0.U
         reference_mem.write_en:=false.B
-        estimate_mem.map(_.read_addr:=address_counter)
+        estimate_mem.map(_.read_addr:=equalize_address_counter)
         estimate_mem.map(_.write_en:=false.B)
 
         // State transition
@@ -198,6 +207,7 @@ class channel_equalizer(
             state:=equalizing
         }
     }.elsewhen( state === updating ) {
+        estimate_address_counter:=0.U
         // State operation
         when ( r_reference_write_en ) {
             reference_mem.write_addr:=r_reference_addr
@@ -216,6 +226,7 @@ class channel_equalizer(
             state:=updating
         }
     }.elsewhen( state === reading ) {
+        estimate_address_counter:=0.U
         // State operation
         when ( r_reference_read_en ) {
             reference_mem.read_addr:=r_reference_addr
@@ -232,14 +243,27 @@ class channel_equalizer(
             state:=reading
         }
     }.elsewhen( state === estimating ) {
-        reference_mem.read_addr:=address_counter
+        reference_mem.read_addr:=estimate_address_counter
         reference_mem.write_en:=false.B
-        estimate_mem.map(_.write_addr:=address_counter)
-        estimate_mem(r_estimate_user_index).write_en:=true.B
+        estimate_mem.map(_.write_addr:=ShiftRegister(estimate_address_counter,reciprocal_latency))
         estimate_mem(r_estimate_user_index).write_val:=reciprocal.Q.asTypeOf(estimate_mem(0).write_val)
-
         // State transition
-        when ( address_counter < log2Ceil(symbol_length).asUInt ) {
+        when ( estimate_address_counter === (symbol_length-1).asUInt && ! r_estimate_done_flag ) {
+            estimate_address_counter:=0.U
+            r_write_en:=true.B
+            r_estimate_done_flag:=true.B
+        }.elsewhen( r_estimate_done_flag ) {
+            estimate_address_counter:=0.U
+            r_write_en:=false.B
+        }.otherwise {
+            estimate_address_counter:=estimate_address_counter+1.U
+            r_write_en:=true.B
+            r_estimate_done_flag:=false.B
+        }
+        estimate_mem(r_estimate_user_index).write_en:=ShiftRegister(r_write_en,reciprocal_latency-1)
+        r_estimate_done:=ShiftRegister(r_estimate_done_flag,reciprocal_latency-1)
+        // State transition
+        when ( ! r_estimate_done ) {
             state:=estimating
         }.otherwise{
             state:=equalizing
@@ -256,11 +280,11 @@ class channel_equalizer(
         // Compensation required to get the reference
         // for local beamforming
         r_N:=reference_mem.read_val.asTypeOf(reciprocal.N.cloneType)
-        r_D:=r_A.asTypeOf(reciprocal.D.cloneType)
+        r_D:=ShiftRegister(r_A.asTypeOf(reciprocal.D.cloneType),mem_latency)
     }.elsewhen(r_estimate_format === 1.U) {
         // Channel response. 
         // Attenuation relative to reference
-        r_N:=r_A.conj().asTypeOf(reciprocal.N.cloneType)
+        r_N:=ShiftRegister(r_A.conj().asTypeOf(reciprocal.N.cloneType),mem_latency)
         r_D.real:=reference_mem.read_val.asTypeOf(reciprocal.D.cloneType).real
         r_D.imag:=reference_mem.read_val.asTypeOf(reciprocal.D.cloneType).imag
     }.otherwise {
@@ -268,7 +292,7 @@ class channel_equalizer(
         // Compensation required to get the reference
         // for local beamforming
         r_N:=reference_mem.read_val.asTypeOf(reciprocal.N.cloneType)
-        r_D:=r_A.asTypeOf(reciprocal.D.cloneType)
+        r_D:=ShiftRegister(r_A.asTypeOf(reciprocal.D.cloneType),mem_latency)
     }
 
     
