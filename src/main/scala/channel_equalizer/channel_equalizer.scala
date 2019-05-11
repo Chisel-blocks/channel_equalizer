@@ -246,7 +246,8 @@ class channel_equalizer(
         reference_mem.read_addr:=estimate_address_counter
         reference_mem.write_en:=false.B
         estimate_mem.map(_.write_addr:=ShiftRegister(estimate_address_counter,reciprocal_latency))
-        estimate_mem(r_estimate_user_index).write_val:=reciprocal.Q.asTypeOf(estimate_mem(0).write_val)
+        estimate_mem(r_estimate_user_index).write_val.real:=reciprocal.Q.real.asTypeOf(estimate_mem(0).write_val.real)
+        estimate_mem(r_estimate_user_index).write_val.imag:=reciprocal.Q.imag.asTypeOf(estimate_mem(0).write_val.imag)
         // State transition
         when ( estimate_address_counter === (symbol_length-1).asUInt && ! r_estimate_done_flag ) {
             estimate_address_counter:=0.U
