@@ -50,22 +50,22 @@ class channel_equalizer_io(
             )) 
         )
 
-        val estimate_format= Input(UInt(1.W))
         
         val reference_addr=Input(UInt(log2Ceil(symbol_length).W))
-
         val reference_read_en=Input(Bool())
         val reference_write_en=Input(Bool())
-        val reference_mode=Input(UInt(2.W)) //0 internal read, 1 write in, read out
 
-        val estimate_read_en=Input(Bool())
         val estimate_addr=Input(UInt(log2Ceil(symbol_length).W))
+        val estimate_read_en=Input(Bool())
         val estimate_write_en=Input(Bool())
-        val estimate_mode=Input(UInt(2.W)) //0 internal read/write, 1 write in, read out
 
-        val equalize_sync=Input(Bool()) //Rising edge resets the bin counters
-        val estimate_sync=Input(Bool()) //Rising edge resets the bin counters
-        val estimate_user_index=Input(UInt(log2Ceil(users).W)) // User to estimate
+        val estimate_format= Input(UInt(1.W)) // 0 Ref/Channel response
+                                              // 1 Channel response/Ref
+
+        val equalize_sync=Input(Bool()) //Rising edge resets equalization counters
+
+        val estimate_sync=Input(Bool()) //Rising edge resets the estimation counters
+        val estimate_user_index=Input(UInt(log2Ceil(users).W)) // User to estimate for
         
 
         override def cloneType = (new channel_equalizer_io(
