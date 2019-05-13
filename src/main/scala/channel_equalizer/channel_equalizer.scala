@@ -24,10 +24,10 @@ class channel_equalizer_io(
                 SInt((n).W)
             ) 
         )
-        val Z = Output(DspComplex(
+        val Z = Output(Vec(users,DspComplex(
                 SInt((n).W),
                 SInt((n).W)
-            ) 
+            ) )
         )
         val  reference_in= Input(DspComplex(
                 SInt(n.W),
@@ -119,8 +119,9 @@ class channel_equalizer(
 
     // Signal IO registers
     val r_A=RegInit(0.U.asTypeOf(io.A.cloneType))
-    val r_equalized=RegInit(0.U.asTypeOf(reciprocal.Q.cloneType))
-    val r_Z=RegInit(0.U.asTypeOf(io.Z))
+    val r_equalized=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(reciprocal.Q.cloneType))))
+    //val r_Z=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.Z(0).cloneType))))
+    val r_Z=RegInit(0.U.asTypeOf(io.Z.cloneType))
     // Registers for reference IO
     val r_reference_in=RegInit(0.U.asTypeOf(io.reference_in.cloneType))
     val r_reference_write_val=RegInit(0.U.asTypeOf(io.reference_in.cloneType))
@@ -131,12 +132,12 @@ class channel_equalizer(
 
     // Registers for estimate IO
     val r_estimate_user_index=RegInit(0.U.asTypeOf(io.estimate_user_index.cloneType))
-    val r_estimate_in=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.estimate_in(0).cloneType))))
+    val r_estimate_in=RegInit(0.U.asTypeOf(io.estimate_in.cloneType))
     val r_estimate_addr=RegInit(0.U.asTypeOf(io.estimate_addr.cloneType))
     val r_estimate_write_en=RegInit(0.U.asTypeOf(io.estimate_write_en.cloneType))
-    val r_estimate_write_val=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.estimate_out(0).cloneType))))
+    val r_estimate_write_val=RegInit(0.U.asTypeOf(io.estimate_out.cloneType))
     val r_estimate_read_en=RegInit(0.U.asTypeOf(io.estimate_read_en.cloneType))
-    val r_estimate_read_val=RegInit(VecInit(Seq.fill(users)(0.U.asTypeOf(io.estimate_out(0).cloneType))))
+    val r_estimate_read_val=RegInit(0.U.asTypeOf(io.estimate_out.cloneType))
 
     val r_N=RegInit(0.U.asTypeOf(reciprocal.N.cloneType))
     val r_D=RegInit(0.U.asTypeOf(reciprocal.D.cloneType))
@@ -302,14 +303,14 @@ class channel_equalizer(
 
     
     // Equalization and rounding
-    r_equalized:=reciprocal.Q*r_A.asTypeOf(reciprocal.D.cloneType)
-    r_Z.real:=(r_equalized.real << n/2).round.asSInt
-    r_Z.imag:=(r_equalized.imag << n/2).round.asSInt
-
+    for (i <- 0 until users ){
+        r_equalized(i):=estimate_mem(i).read_val*r_A.asTypeOf(reciprocal.D.cloneType)
+        r_Z(i).real:=(r_equalized(i).real << n/2).round.asSInt
+        r_Z(i).imag:=(r_equalized(i).imag << n/2).round.asSInt
+    }
     // Output assignments
     io.reference_out:=r_reference_read_val.asTypeOf(io.reference_out)
     io.estimate_out:=r_estimate_read_val
-  
     io.Z:=r_Z
 }
 
