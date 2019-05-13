@@ -170,6 +170,7 @@ class channel_equalizer(
     estimate_mem.map(_.read_addr:=r_estimate_addr)
     (estimate_mem,r_estimate_in).zipped.map(_.write_val:=_)
     estimate_mem.map(_.write_en:=false.B)
+    
 
    
     // State machine for channel estimation and equalization
@@ -202,6 +203,8 @@ class channel_equalizer(
         }.elsewhen ( reference_read_edge.rising || estimate_read_edge.rising) {
             state:=reading 
         }.elsewhen ( estimate_sync_edge.rising ) {
+            r_estimate_done_flag:=false.B
+            r_estimate_done:=false.B
             state:=estimating
         }. otherwise {
             state:=equalizing
@@ -261,10 +264,11 @@ class channel_equalizer(
             r_write_en:=true.B
             r_estimate_done_flag:=false.B
         }
+        //control estimation delay globally.
+        r_estimate_done:=ShiftRegister(r_estimate_done_flag,reciprocal_latency-1) && r_estimate_done_flag
         estimate_mem(r_estimate_user_index).write_en:=ShiftRegister(r_write_en,reciprocal_latency-1)
-        r_estimate_done:=ShiftRegister(r_estimate_done_flag,reciprocal_latency-1)
         // State transition
-        when ( ! r_estimate_done ) {
+        when ( ! ( r_estimate_done && r_estimate_done_flag ) ) {
             state:=estimating
         }.otherwise{
             state:=equalizing
