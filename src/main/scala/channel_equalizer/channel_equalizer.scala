@@ -102,6 +102,9 @@ class channel_equalizer(
     val mem_latency=4
     val r_estimate_sync=RegInit(false.B)
     val r_equalize_sync=RegInit(false.B)
+    // Sync principle: io_sync is high when correct value is at io.A
+    // Correspondinc rising edge indicator is high when correct value is at
+    // r_A. The rest of the processing is synced accordingly.
     r_estimate_sync:=io.estimate_sync
     r_equalize_sync:=io.equalize_sync
     val reference_read_edge= Module(new edge_detector()).io 
@@ -159,6 +162,8 @@ class channel_equalizer(
 
     (r_estimate_in,io.estimate_in).zipped.map(_:=_)
     (r_estimate_write_val,io.estimate_in).zipped.map(_:=_)
+    r_estimate_write_en:=io.estimate_write_en
+    r_estimate_addr:=io.estimate_addr
     r_estimate_read_en:=io.estimate_read_en
 
     // Mem input defaults
@@ -304,7 +309,7 @@ class channel_equalizer(
     
     // Equalization and rounding
     for (i <- 0 until users ){
-        r_equalized(i):=estimate_mem(i).read_val*r_A.asTypeOf(reciprocal.D.cloneType)
+        r_equalized(i):=estimate_mem(i).read_val*ShiftRegister(r_A.asTypeOf(reciprocal.D.cloneType),mem_latency)
         r_Z(i).real:=(r_equalized(i).real << n/2).round.asSInt
         r_Z(i).imag:=(r_equalized(i).imag << n/2).round.asSInt
     }
