@@ -163,6 +163,7 @@ class channel_equalizer(
     (r_estimate_in,io.estimate_in).zipped.map(_:=_)
     (r_estimate_write_val,io.estimate_in).zipped.map(_:=_)
     r_estimate_write_en:=io.estimate_write_en
+    r_estimate_user_index:=io.estimate_user_index
     r_estimate_addr:=io.estimate_addr
     r_estimate_read_en:=io.estimate_read_en
 
