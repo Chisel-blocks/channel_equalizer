@@ -60,9 +60,7 @@ class channel_equalizer_io(
         val estimate_write_en=Input(Bool())
 
         val estimate_format= Input(UInt(1.W)) // 0 Ref/Channel response
-                                              // 1 Conj(Channel response)/Ref 
-                                              // Provides conjugate matching, but with gain 
-                                              // Error
+                                              // 1 Channel response/Ref 
 
         val equalize_sync=Input(Bool()) //Rising edge resets equalization counters
 
@@ -258,8 +256,10 @@ class channel_equalizer(
         reference_mem.read_addr:=estimate_address_counter
         reference_mem.write_en:=false.B
         estimate_mem.map(_.write_addr:=ShiftRegister(estimate_address_counter,reciprocal_latency))
-        estimate_mem(r_estimate_user_index).write_val.real:=reciprocal.Q.real.asTypeOf(estimate_mem(0).write_val.real)
-        estimate_mem(r_estimate_user_index).write_val.imag:=reciprocal.Q.imag.asTypeOf(estimate_mem(0).write_val.imag)
+        estimate_mem(r_estimate_user_index).write_val.real:=reciprocal.Q.real
+            .asTypeOf(estimate_mem(0).write_val.real)
+        estimate_mem(r_estimate_user_index).write_val.imag:=reciprocal.Q.imag
+            .asTypeOf(estimate_mem(0).write_val.imag)
         // State transition
         when ( estimate_address_counter === (symbol_length-1).asUInt && ! r_estimate_done_flag ) {
             estimate_address_counter:=0.U
@@ -274,7 +274,9 @@ class channel_equalizer(
             r_estimate_done_flag:=false.B
         }
         //control estimation delay globally.
-        r_estimate_done:=ShiftRegister(r_estimate_done_flag,reciprocal_latency-1) && r_estimate_done_flag
+        r_estimate_done:=(ShiftRegister(r_estimate_done_flag,reciprocal_latency-1) 
+            && r_estimate_done_flag
+        )
         estimate_mem(r_estimate_user_index).write_en:=ShiftRegister(r_write_en,reciprocal_latency-1)
         // State transition
         when ( ! ( r_estimate_done && r_estimate_done_flag ) ) {
@@ -298,7 +300,7 @@ class channel_equalizer(
     }.elsewhen(r_estimate_format === 1.U) {
         // Channel response. 
         // Attenuation relative to reference
-        r_N:=ShiftRegister(r_A.conj().asTypeOf(reciprocal.N.cloneType),mem_latency)
+        r_N:=ShiftRegister(r_A.asTypeOf(reciprocal.N.cloneType),mem_latency)
         r_D.real:=reference_mem.read_val.asTypeOf(reciprocal.D.cloneType).real
         r_D.imag:=reference_mem.read_val.asTypeOf(reciprocal.D.cloneType).imag
     }.otherwise {
@@ -312,7 +314,9 @@ class channel_equalizer(
     
     // Equalization and rounding
     for (i <- 0 until users ){
-        r_equalized(i):=estimate_mem(i).read_val*ShiftRegister(r_A.asTypeOf(reciprocal.D.cloneType),mem_latency)
+        r_equalized(i):=(estimate_mem(i).read_val
+                    *ShiftRegister(r_A.asTypeOf(reciprocal.D.cloneType),mem_latency)
+                )
         r_Z(i).real:=(r_equalized(i).real << n/2).round.asSInt
         r_Z(i).imag:=(r_equalized(i).imag << n/2).round.asSInt
     }
