@@ -60,7 +60,9 @@ class channel_equalizer_io(
         val estimate_write_en=Input(Bool())
 
         val estimate_format= Input(UInt(1.W)) // 0 Ref/Channel response
-                                              // 1 Channel response/Ref
+                                              // 1 Conj(Channel response)/Ref 
+                                              // Provides conjugate matching, but with gain 
+                                              // Error
 
         val equalize_sync=Input(Bool()) //Rising edge resets equalization counters
 
