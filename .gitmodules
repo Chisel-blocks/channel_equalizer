@@ -1,9 +1,9 @@
 [submodule "complex_reciprocal"]
 	path = complex_reciprocal
-	url = git@bwrcrepo.eecs.berkeley.edu:dsp-blocks/chisel/complex_reciprocal.git
+	url = git@github.com:Chisel-blocks/complex_reciprocal.git
 [submodule "memblock"]
 	path = memblock
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/memblock.git
+	url = git@github.com:Chisel-blocks/memblock.git
 [submodule "edge_detector"]
 	path = edge_detector
-	url = git@bwrcrepo.eecs.berkeley.edu:fader2/chisel/edge_detector.git
+	url = git@github.com:Chisel-blocks/edge_detector.git
