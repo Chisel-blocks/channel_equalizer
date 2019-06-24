@@ -8,7 +8,7 @@ name := "channel_equalizer"
 
 version := scala.sys.process.Process("git rev-parse --short HEAD").!!.mkString.replaceAll("\\s", "")+"-SNAPSHOT"
 
-scalaVersion := "2.11.11"
+scalaVersion := "2.12.3"
 
 // [TODO] what are these needed for? remove if obsolete
 def scalacOptionsVersion(scalaVersion: String): Seq[String] = {
@@ -68,10 +68,6 @@ val defaultVersions = Map(
 
 libraryDependencies ++= (Seq("chisel3","chisel-iotesters","dsptools").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) })
-
-
-//This is (mainly) for TheSDK testbenches, may become obsolete
-libraryDependencies += "com.gilt" %% "handlebars-scala" % "2.1.1"
 
 libraryDependencies  ++= Seq(
 //  // Last stable release
